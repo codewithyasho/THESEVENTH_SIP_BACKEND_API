@@ -1,2 +1,5 @@
 fastapi[standard]
 uvicorn[standard]
+sqlmodel
+tzdata
+python-dotenv
