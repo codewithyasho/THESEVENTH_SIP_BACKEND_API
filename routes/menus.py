@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
-from models.menu import MenuTable, ReadMenu, CreateMenu, UpdateMenu, CreateBulkMenu, BulkMenuResponse, ReadMenuCount
+from models.menu import MenuTable, MenuResponseModel, CreateMenu, UpdateMenu, CreateBulkMenu, BulkMenuResponse, ReadMenuCount
 from src.database import get_session
 from src.auth import verify_api_key
 
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/menu", tags=["Admin Menu Management"])
 # ENDPOINT 1: create new menu
 @router.post(
     "/create", 
-    response_model=ReadMenu,
+    response_model=MenuResponseModel,
     description="Create a new menu item. Requires admin API key.",
     response_description="Returns the created menu item.",
     summary="Create a new menu item"
@@ -21,7 +21,7 @@ def create_menu(
     admin_key: str = Depends(verify_api_key),
     session: Session = Depends(get_session)
 ):
-
+    # Check if the menu item already exists
     existing_menu = session.exec(
         select(MenuTable).where(
             MenuTable.menu_name == menu_data.menu_name
@@ -238,7 +238,7 @@ def filter_menu_by_price(
 # ENDPOINT 8: update item by id
 @router.patch(
     "/update/{menu_id}", 
-    response_model=ReadMenu,
+    response_model=MenuResponseModel,
     description="Update a menu item by ID. Requires admin API key.",
     response_description="Returns the updated menu item.",
     summary="Update a menu item by ID"

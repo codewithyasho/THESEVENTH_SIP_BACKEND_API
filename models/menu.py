@@ -8,6 +8,13 @@ class MenuTable(SQLModel, table=True):
     menu_price: int = Field(default=None, ge=1)
 
 
+class MenuResponseModel(SQLModel):
+    menu_id: int
+    menu_name: str
+    menu_category: str
+    menu_price: int
+
+
 class CreateMenu(SQLModel):
     menu_name: str
     menu_category: str
@@ -21,19 +28,13 @@ class CreateBulkMenu(SQLModel):
 class BulkMenuResponse(SQLModel):
     status: str = Field(default="success")
     count: int
-    menus: list[ReadMenu]
-
-class ReadMenu(SQLModel):
-    menu_id: int
-    menu_name: str
-    menu_category: str
-    menu_price: int
+    menus: list[MenuResponseModel]
 
 
 class ReadMenuCount(SQLModel):
     status: str = Field(default="success") 
     count: int
-    menus: list[ReadMenu]
+    menus: list[MenuResponseModel]
 
 
 class UpdateMenu(SQLModel):

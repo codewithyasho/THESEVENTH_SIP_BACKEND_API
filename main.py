@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from src.database import init_db
 from routes.menus import router as menu_router
+from routes.users import router as user_router
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import IntegrityError
 from src.exceptions import validation_exception_handler, integrity_exception_handler
@@ -27,6 +28,7 @@ app = FastAPI(
 
 ## ENDPOINTS
 app.include_router(menu_router)
+app.include_router(user_router)
 
 
 ## CUSTOM EXCEPTION HANDLERS

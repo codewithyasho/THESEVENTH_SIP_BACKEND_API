@@ -3,3 +3,4 @@ uvicorn[standard]
 sqlmodel
 tzdata
 python-dotenv
+email-validator
