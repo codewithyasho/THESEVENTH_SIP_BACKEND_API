@@ -15,7 +15,7 @@ def generate_secret_key(length: int = 12):
     )
 
 
-router = APIRouter(prefix="/users", tags=["User Management"])
+router = APIRouter(prefix="/users", tags=["Backend: Admin User Management"])
 
 
 
@@ -24,6 +24,7 @@ router = APIRouter(prefix="/users", tags=["User Management"])
     response_model=RegisterResponseModel,
     description="Register a new user.",
     response_description="Returns the registered user details.",
+    tags=["Frontend: For Users"]
 )
 def register_user(
     user_data: RegisterUser,
@@ -84,6 +85,7 @@ def register_user(
     response_model=LoginResponseModel,
     description="Login a user.",
     response_description="Returns the logged-in user details.",
+    tags=["Frontend: For Users"]
 )
 def login_user(
     user_data: LoginUser,
@@ -119,7 +121,7 @@ def login_user(
 
 # list all users
 @router.get(
-    "/list",
+    "/admin/list",
     response_model=ListUsers,
     description="List all registered users.",
     response_description="Returns a list of all registered users.",
@@ -135,7 +137,7 @@ def list_users(session: Session = Depends(get_session), api_key: str = Depends(v
 
 # list usernames only
 @router.get(
-    "/list/usernames",
+    "/admin/list/usernames",
     description="List all registered usernames.",
     response_description="Returns a list of all registered usernames.",
 )
@@ -146,7 +148,7 @@ def list_usernames(session: Session = Depends(get_session), api_key: str = Depen
 
 # get user by id
 @router.get(
-    "/{user_id}",
+    "/admin/{user_id}",
     response_model=UserResponseModel,
     description="Get user details by user ID.",
     response_description="Returns the user details for the specified user ID.",
@@ -169,7 +171,8 @@ def get_user_by_id(user_id: int, session: Session = Depends(get_session), api_ke
     "/update",
     response_model=UserResponseModel,
     description="Update the currently authenticated user's details.",
-    response_description="Returns the updated user details."
+    response_description="Returns the updated user details.",
+    tags=["Frontend: For Users"]
 )
 def update_user(
     update_data: UpdateUser,
@@ -236,7 +239,7 @@ def update_user(
 
 # delete user by id
 @router.delete(
-    "/{user_id}",
+    "/admin/delete/{user_id}",
     description="Delete a user by user ID. Admin access required.",
     response_description="Returns a success message upon successful deletion.",
 )

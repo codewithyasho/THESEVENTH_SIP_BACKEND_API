@@ -5,12 +5,12 @@ from src.database import get_session
 from src.auth import verify_api_key
 
 
-router = APIRouter(prefix="/menu", tags=["Admin Menu Management"])
+router = APIRouter(prefix="/menu", tags=["Backend: Admin Menu Management"])
 
 
 # ENDPOINT 1: create new menu
 @router.post(
-    "/create", 
+    "/admin/create", 
     response_model=MenuResponseModel,
     description="Create a new menu item. Requires admin API key.",
     response_description="Returns the created menu item.",
@@ -45,7 +45,7 @@ def create_menu(
 
 # Endpoitn 2: create bulk menu
 @router.post(
-    "/create/bulk",
+    "/admin/create/bulk",
     response_model=BulkMenuResponse,
     description="Create multiple menu items in bulk. Requires admin API key.",
     response_description="Returns the list of created menu items.",
@@ -95,9 +95,11 @@ def create_bulk_menu(
 @router.get(
     "/list", 
     response_model=ReadMenuCount,
-    description="List all menu items. Requires admin API key.",
+    description="List all menu items.",
     response_description="Returns the list of all menu items.",
-    summary="List all menu items"
+    summary="List all menu items",
+    tags=["Frontend: For Users"]
+
 )
 def list_menu(
     session : Session = Depends(get_session)
@@ -117,9 +119,11 @@ def list_menu(
 @router.get(
     "/filter", 
     response_model=ReadMenuCount,
-    description="Filter menu items by category with pagination. Requires admin API key.",
+    description="Filter menu items by category with pagination.",
     response_description="Returns the list of filtered menu items.",
-    summary="Filter menu items by category with pagination"
+    summary="Filter menu items by category with pagination",
+    tags=["Frontend: For Users"]
+
 )
 def filter_menu(
     category: str | None = Query(default=None, description="Enter the category to filter"),
@@ -148,9 +152,11 @@ def filter_menu(
 # ENDPOINT 5: list all the menu name only.
 @router.get(
     "/list/names", 
-    description="List all menu names. Requires admin API key.",
+    description="List all menu names.",
     response_description="Returns the list of all menu names.",
-    summary="List all menu names"
+    summary="List all menu names",
+    tags=["Frontend: For Users"]
+
 )
 def list_names(session: Session = Depends(get_session)):
     query = select(MenuTable.menu_name).distinct()
@@ -167,9 +173,11 @@ def list_names(session: Session = Depends(get_session)):
 # ENDPOINT 5.1: list all the categories only.
 @router.get(
     "/list/categories",
-    description="List all menu categories. Requires admin API key.",
+    description="List all menu categories.",
     response_description="Returns the list of all menu categories.",
-    summary="List all menu categories"
+    summary="List all menu categories",
+    tags=["Frontend: For Users"]
+
 )
 def list_categories(session: Session = Depends(get_session)):
     query = select(MenuTable.menu_category).distinct()
@@ -188,9 +196,11 @@ def list_categories(session: Session = Depends(get_session)):
 @router.get(
     "/list/price", 
     response_model=ReadMenuCount,
-    description="List all menu items sorted by price from lowest to highest. Requires admin API key.",
+    description="List all menu items sorted by price from lowest to highest.",
     response_description="Returns the list of all menu items sorted by price from lowest to highest.",
-    summary="List menu items by price"
+    summary="List menu items by price",
+    tags=["Frontend: For Users"]
+
 )
 def list_menu_by_price(session: Session = Depends(get_session)):
     query = select(MenuTable).order_by(MenuTable.menu_price.asc())
@@ -210,7 +220,9 @@ def list_menu_by_price(session: Session = Depends(get_session)):
     response_model=ReadMenuCount,
     description="Filter menu items by price range.",
     response_description="Returns the list of filtered menu items.",
-    summary="Filter menu items by price range"
+    summary="Filter menu items by price range",
+    tags=["Frontend: For Users"]
+
 )
 def filter_menu_by_price(
     min_price: int = Query(default=1, ge=1, description="Minimum price to filter"),
@@ -237,7 +249,7 @@ def filter_menu_by_price(
 
 # ENDPOINT 8: update item by id
 @router.patch(
-    "/update/{menu_id}", 
+    "/admin/update/{menu_id}", 
     response_model=MenuResponseModel,
     description="Update a menu item by ID. Requires admin API key.",
     response_description="Returns the updated menu item.",
@@ -270,7 +282,7 @@ def update_menu(
 
 # ENDPOINT 9: delete item by id
 @router.delete(
-    "/delete/{menu_id}", 
+    "/admin/delete/{menu_id}", 
     description="Delete a menu item by ID. Requires admin API key.", 
     response_description="Returns a message confirming the deletion of the menu item.", 
     summary="Delete a menu item by ID"

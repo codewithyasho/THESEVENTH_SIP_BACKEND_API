@@ -1,9 +1,11 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import uvicorn
 from src.database import init_db
 from routes.menus import router as menu_router
 from routes.users import router as user_router
+from routes.addons import router as addon_router
+from routes.orders import router as order_router
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import IntegrityError
 from src.exceptions import validation_exception_handler, integrity_exception_handler
@@ -29,6 +31,8 @@ app = FastAPI(
 ## ENDPOINTS
 app.include_router(menu_router)
 app.include_router(user_router)
+app.include_router(addon_router)
+app.include_router(order_router)
 
 
 ## CUSTOM EXCEPTION HANDLERS
@@ -46,8 +50,8 @@ app.add_exception_handler(
 @app.get("/")
 def home():
     return {
+        "status": "healthy",
         "message": "Welcome to the THESEVENTH SIP Backend API",
-        "status": "healthy"
     }
 
 
