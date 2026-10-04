@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlmodel import Session, select, func
+from sqlalchemy import desc
 
 from src.database import get_session
 from src.auth import get_current_user
@@ -18,13 +19,16 @@ from models.order import (
     ReadOrderWithItems,
     ReadOrderItem,
     ReadOrderAddon,
-    OrderStatus
+    OrderStatus,
+    ReadOrder
 )
 
 from src.auth import (
     get_current_user,
     verify_api_key
 )
+
+from datetime import datetime, timezone
 
 
 ## helper function 
@@ -99,6 +103,84 @@ router = APIRouter(
     prefix="/orders",
     tags=["Backend: Admin Orders Management"]
 )
+
+
+
+# ENDPOINT 6: List all orders, admin only
+@router.get(
+    "/admin/list/all",
+    response_model=list[ReadOrderWithItems],
+    description="List all orders. Admin access only.",
+    response_description="Returns a list of all orders in the system."
+)    
+def list_all_orders(
+    api_key: str = Depends(verify_api_key),
+    session: Session = Depends(get_session)
+):
+
+    orders = session.exec(
+        select(OrderTable)
+    ).all()
+
+    return [
+        get_order_with_items(
+            order,
+            session
+        )
+        for order in orders
+    ]
+
+
+
+# users/summary: endpoint for the user to see their own order summary, requires user authentication
+@router.get(
+        "/user/summary",
+        description="Get the currently authenticated user's order summary.",
+        response_description="Returns the order summary of the currently authenticated user.",
+        tags=["Frontend: For Users"]
+)
+def get_user_order_summary(
+    current_user: UserTable = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    # Get the user's order summary
+    total_orders = session.exec(
+        select(func.count(OrderTable.order_id)).where(OrderTable.user_id == current_user.user_id)
+    ).first()
+
+    pending_orders = session.exec(
+        select(func.count(OrderTable.order_id)).where(
+            OrderTable.user_id == current_user.user_id,
+            OrderTable.status == "PENDING"
+        )
+    ).first()
+
+    completed_orders = session.exec(
+        select(func.count(OrderTable.order_id)).where(
+            OrderTable.user_id == current_user.user_id,
+            OrderTable.status == "DELIVERED"
+        )
+    ).first()
+
+    cancelled_orders = session.exec(
+        select(func.count(OrderTable.order_id)).where(
+            OrderTable.user_id == current_user.user_id,
+            OrderTable.status == "CANCELED"
+        )
+    ).first()
+
+    total_spent = session.exec(
+        select(func.sum(OrderTable.total_amount)).where(OrderTable.user_id == current_user.user_id)
+    ).first() or 0
+
+    return {
+        "total_orders": total_orders,
+        "pending_orders": pending_orders,
+        "completed_orders": completed_orders,
+        "cancelled_orders": cancelled_orders,
+        "total_spent": total_spent
+    }
+
 
 
 # ENDPOINT 1: Create Order, user must be logged in to create an order
@@ -491,17 +573,207 @@ def get_my_orders(
     ]
 
 
-# ENDPOINT 4: Get order by ID, user must be logged in to view their own orders
+
+# multi parameter filtering for users.
+# user can filter their orders by status of order with pagination.
 @router.get(
-    "/{order_id}",
-    response_model=ReadOrderWithItems,
-    description="Get order details by order ID for the currently authenticated user.",
-    response_description="Returns the order details for the specified order ID.",
+    "/my-orders/filter",
+    response_model=list[ReadOrderWithItems],
+    description="Filter the currently authenticated user's orders by status.",
+    response_description="Returns a list of orders filtered by the specified status.",
     tags=["Frontend: For Users"]
+)
+def filter_my_orders(
+    status: OrderStatus = Query(
+        ...,
+        description="The status to filter orders by."
+    ),
+    skip: int = Query(
+        default=0,
+        ge=0,
+        description="Number of records to skip for pagination."
+    ),
+    limit: int = Query(
+        default=10,
+        le=50,
+        description="Maximum number of records to return for pagination."
+    ),
+    current_user: UserTable = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+
+    orders = session.exec(
+        select(OrderTable)
+        .where(
+            OrderTable.user_id == current_user.user_id,
+            OrderTable.status == status
+        )
+        .offset(skip)
+        .limit(limit)
+    ).all()
+
+    return [
+        get_order_with_items(
+            order,
+            session
+        )
+        for order in orders
+    ]
+
+
+
+# multi parameter filtering for admin.
+# admin can filter all orders by status of order with pagination.
+@router.get(
+        "/admin/list/filter",
+        response_model=list[ReadOrderWithItems],
+        description="Filter all orders by status.",
+        response_description="Returns a list of orders filtered by the specified status.",
+)
+def filter_all_orders(
+    status: OrderStatus = Query(
+        ...,
+        description="The status to filter orders by."
+    ),
+    skip: int = Query(
+        default=0,
+        ge=0,
+        description="Number of records to skip for pagination."
+    ),
+    limit: int = Query(
+        default=10,
+        le=50,
+        description="Maximum number of records to return for pagination."
+    ),
+    api_key: str = Depends(verify_api_key),
+    session: Session = Depends(get_session)
+):
+
+    orders = session.exec(
+        select(OrderTable)
+        .where(OrderTable.status == status)
+        .offset(skip)
+        .limit(limit)
+    ).all()
+
+    return [
+            get_order_with_items(
+                order,
+                session
+            )
+            for order in orders
+        ]
+
+
+# GET /orders/admin/today Returns today's orders.
+@router.get(
+    "/admin/today",
+    response_model=list[ReadOrderWithItems],
+    description="Returns today's orders.",
+    response_description="Returns a list of orders created today."
+)
+def get_todays_orders(
+    api_key: str = Depends(verify_api_key),
+    session: Session = Depends(get_session)
+):
+
+    today = datetime.now(timezone.utc).date()
+
+    orders = session.exec(
+        select(OrderTable).where(
+            func.date(OrderTable.created_at) == today
+        )
+    ).all()
+
+    return [
+        get_order_with_items(
+            order,
+            session
+        )
+        for order in orders
+    ]   
+
+
+
+# Admin Dashboard Statistics
+@router.get(
+    "/admin/dashboard",
+    response_model=dict,
+    description="Returns admin dashboard statistics.",
+    response_description="Returns a dictionary containing various statistics for the admin dashboard."
+)
+def get_admin_dashboard_statistics(
+    api_key: str = Depends(verify_api_key),
+    session: Session = Depends(get_session)
+):
+
+    today = datetime.now(timezone.utc).date()
+
+    total_orders = session.exec(
+        select(func.count(OrderTable.order_id))
+    ).first()
+
+    today_orders = session.exec(
+        select(func.count(OrderTable.order_id)).where(
+            func.date(OrderTable.created_at) == today
+        )
+    ).first()
+
+    pending_orders = session.exec(
+        select(func.count(OrderTable.order_id)).where(
+            OrderTable.status == "PENDING"
+        )
+    ).first()
+
+    completed_orders = session.exec(
+        select(func.count(OrderTable.order_id)).where(
+            OrderTable.status == "DELIVERED"
+        )
+    ).first()
+
+    cancelled_orders = session.exec(
+        select(func.count(OrderTable.order_id)).where(
+            OrderTable.status == "CANCELED"
+        )
+    ).first()
+
+    total_revenue = session.exec(
+        select(func.sum(OrderTable.total_amount))
+    ).first() or 0
+
+    today_revenue = session.exec(
+        select(func.sum(OrderTable.total_amount)).where(
+            func.date(OrderTable.created_at) == today
+        )
+    ).first() or 0
+
+    total_users = session.exec(
+        select(func.count(UserTable.user_id))
+    ).first()
+
+    return {
+        "total_orders": total_orders,
+        "today_orders": today_orders,
+        "pending_orders": pending_orders,           
+        "completed_orders": completed_orders,
+        "cancelled_orders": cancelled_orders,
+        "total_revenue": total_revenue,
+        "today_revenue": today_revenue,
+        "total_users": total_users
+    }
+
+
+
+# ENDPOINT 4: Get order by ID, admin can view any order by order id.
+@router.get(
+    "/admin/list/{order_id}",
+    response_model=ReadOrderWithItems,
+    description="Get order details by order ID. Admin access only.",
+    response_description="Returns the order details for the specified order ID."
 )
 def get_order(
     order_id: int,
-    current_user: UserTable = Depends(get_current_user),
+    api_key: str = Depends(verify_api_key),
     session: Session = Depends(get_session)
 ):
 
@@ -515,14 +787,6 @@ def get_order(
         raise HTTPException(
             status_code=404,
             detail="Order not found"
-        )
-
-    # Don't allow user to see someone else's order
-    if order.user_id != current_user.user_id:
-
-        raise HTTPException(
-            status_code=403,
-            detail="You cannot access this order."
         )
 
     return get_order_with_items(
@@ -585,3 +849,201 @@ def cancel_order(
         order,
         session
     )
+
+
+
+
+from datetime import datetime, timedelta, timezone  
+from sqlmodel import Session, select, func
+
+
+@router.get(
+    "/analytics/revenue",
+    description="Get revenue analytics. Admin access only.",
+    response_description="Returns revenue statistics."
+)
+def revenue_analytics(
+    period: str = Query(
+        default="daily",
+        description="The period for which to fetch revenue data. Must be 'daily', 'weekly', or 'monthly'."
+    ),
+    api_key: str = Depends(verify_api_key),
+    session: Session = Depends(get_session)
+):
+
+    now = datetime.now(timezone.utc)
+
+    if period == "daily":
+
+        start_date = now.replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0
+        )
+
+    elif period == "weekly":
+
+        start_date = now - timedelta(days=7)
+
+    elif period == "monthly":
+
+        start_date = now - timedelta(days=30)
+
+    else:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Period must be daily, weekly or monthly."
+        )
+
+    revenue = session.exec(
+        select(
+            func.sum(OrderTable.total_amount)
+        )
+        .where(
+            OrderTable.created_at >= start_date,
+            OrderTable.status == OrderStatus.DELIVERED
+        )
+    ).one()
+
+    return {
+        "period": period,
+        "revenue": float(revenue or 0)
+    }
+
+
+
+# order analytics endpoint for admin to see order statistics by status.
+@router.get(
+    "/analytics/orders",
+    description="Get order statistics by status. Admin access only.",
+    response_description="Returns order statistics."
+)
+def order_analytics(
+    api_key: str = Depends(verify_api_key),
+    session: Session = Depends(get_session)
+):
+
+    pending = session.exec(
+        select(func.count(OrderTable.order_id))
+        .where(OrderTable.status == OrderStatus.PENDING)
+    ).one()
+
+    confirmed = session.exec(
+        select(func.count(OrderTable.order_id))
+        .where(OrderTable.status == OrderStatus.CONFIRMED)
+    ).one()
+
+    preparing = session.exec(
+        select(func.count(OrderTable.order_id))
+        .where(OrderTable.status == OrderStatus.PREPARING)
+    ).one()
+
+    on_the_way = session.exec(
+        select(func.count(OrderTable.order_id))
+        .where(OrderTable.status == OrderStatus.ON_THE_WAY)
+    ).one()
+
+    delivered = session.exec(
+        select(func.count(OrderTable.order_id))
+        .where(OrderTable.status == OrderStatus.DELIVERED)
+    ).one()
+
+    canceled = session.exec(
+        select(func.count(OrderTable.order_id))
+        .where(OrderTable.status == OrderStatus.CANCELED)
+    ).one()
+
+    return {
+        "pending": pending,
+        "confirmed": confirmed,
+        "preparing": preparing,
+        "on_the_way": on_the_way,
+        "delivered": delivered,
+        "canceled": canceled
+    }
+
+
+
+
+
+# top 3 customers based on total spending with customer name and total orders.
+@router.get(
+    "/analytics/top-customers",
+    description="Get top 3 customers based on total spending. Admin access only.",
+    response_description="Returns a list of top 3 customers with their total spending."
+)
+def top_customers(
+    api_key: str = Depends(verify_api_key),
+    session: Session = Depends(get_session)
+):
+    results = session.exec(
+        select(
+            OrderTable.user_id,
+            UserTable.username,
+            func.sum(OrderTable.total_amount).label("total_spent"),
+            func.count(OrderTable.order_id).label("total_orders")
+        )
+        .join(UserTable, UserTable.user_id == OrderTable.user_id)
+        .group_by(UserTable.user_id)
+        .order_by(desc("total_spent"))
+        .limit(3)
+    ).all()
+
+    return [
+        {
+            "customer_id": user_id, 
+            "customer_name": name,
+            "total_spent": float(total_spent),
+            "total_orders": total_orders
+        }
+        for user_id, name, total_spent, total_orders in results
+    ]
+
+
+
+# Top Selling Items
+@router.get(
+    "/analytics/top-items",
+    description="Get top 5 selling menu items. Admin access only.",
+    response_description="Returns the top 5 selling menu items."
+)
+def top_selling_items(
+    api_key: str = Depends(verify_api_key),
+    session: Session = Depends(get_session)
+):
+
+    results = session.exec(
+        select(
+            OrderMenuTable.menu_name,
+            func.sum(OrderMenuTable.quantity).label("quantity_sold"),
+            func.sum(
+                OrderMenuTable.price * OrderMenuTable.quantity
+            ).label("revenue")
+        )
+        .join(
+            OrderTable,
+            OrderTable.order_id == OrderMenuTable.order_id
+        )
+        .where(
+            OrderTable.status == OrderStatus.DELIVERED
+        )
+        .group_by(
+            OrderMenuTable.menu_id,
+            OrderMenuTable.menu_name
+        )
+        .order_by(
+            func.sum(OrderMenuTable.quantity).desc()
+        )
+        .limit(5)
+    ).all()
+
+    return [
+        {
+            "menu_name": menu_name,
+            "quantity_sold": int(quantity_sold),
+            "revenue": float(revenue or 0)
+        }
+        for menu_name, quantity_sold, revenue in results
+    ]

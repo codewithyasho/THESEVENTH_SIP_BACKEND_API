@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
-from models.menu import MenuTable, MenuResponseModel, CreateMenu, UpdateMenu, CreateBulkMenu, BulkMenuResponse, ReadMenuCount
+from models.menu import MenuTable, MenuResponseModel, CreateMenu, UpdateMenu, CreateBulkMenu, BulkMenuResponse, ReadMenuCount, MostOrderedMenu
 from src.database import get_session
 from src.auth import verify_api_key
-
+from models.order import OrderMenuTable
 
 router = APIRouter(prefix="/menu", tags=["Backend: Admin Menu Management"])
 
@@ -301,3 +301,67 @@ def delete_menu(menu_id: int, session: Session = Depends(get_session), admin_key
 
 
 
+# Menu Statistics
+# GET /menu/admin/stats
+@router.get(
+    "/admin/stats",
+    description="Get menu statistics. Requires admin API key.",
+    response_description="Returns the menu statistics.",
+    summary="Get menu statistics"
+)
+def get_menu_stats(
+    session: Session = Depends(get_session),
+    admin_key: str = Depends(verify_api_key)
+):
+    total_menus = session.exec(select(func.count(MenuTable.menu_id))).one()
+    average_price = session.exec(select(func.avg(MenuTable.menu_price))).one()
+    min_price = session.exec(select(func.min(MenuTable.menu_price))).one()
+    max_price = session.exec(select(func.max(MenuTable.menu_price))).one()
+
+    return {
+        "total_menus": total_menus,
+        "average_price": round(average_price, 2),
+        "min_price": min_price,
+        "max_price": max_price
+    }
+
+
+
+# TOP 3 MOST ORDERED MENU ITEMS
+@router.get(
+    "/admin/most-ordered",
+    response_model=list[MostOrderedMenu],
+    description="Get the top 3 most ordered menu items. Admin access only.",
+    response_description="Returns the top 3 most ordered menu items."
+)
+def get_most_ordered_items(
+    api_key: str = Depends(verify_api_key),
+    session: Session = Depends(get_session)
+):
+
+    results = session.exec(
+        select(
+            OrderMenuTable.menu_name,
+            func.sum(OrderMenuTable.quantity).label("orders")
+        )
+        .group_by(
+            OrderMenuTable.menu_id,
+            OrderMenuTable.menu_name
+        )
+        .order_by(
+            func.sum(OrderMenuTable.quantity).desc()
+        )
+        .limit(3)
+    ).all()
+
+    return [
+        MostOrderedMenu(
+            menu_name=menu_name,
+            orders=int(orders)
+        )
+        for menu_name, orders in results
+    ]
+
+
+
+#

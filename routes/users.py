@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from models.user import UserTable, UserResponseModel, RegisterResponseModel, LoginResponseModel, RegisterUser, LoginUser, ListUsers, UpdateUser
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 from src.database import get_session
 from src.auth import verify_api_key, get_current_user
 import secrets
@@ -117,6 +117,22 @@ def login_user(
         "message": f"Welcome Back, {existing_user.username}",
         "user": existing_user
     }
+
+
+
+# users/me: endpoint for the user to see their own details, requires user authentication
+@router.get(
+    "/me",
+    response_model=UserResponseModel,
+    description="Get the currently authenticated user's details.",
+    response_description="Returns the details of the currently authenticated user.",
+    tags=["Frontend: For Users"]
+)
+def get_current_user_details(
+    current_user: UserTable = Depends(get_current_user)
+):
+    return current_user
+
 
 
 # list all users

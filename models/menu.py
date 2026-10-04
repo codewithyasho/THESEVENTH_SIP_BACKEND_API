@@ -41,3 +41,12 @@ class UpdateMenu(SQLModel):
     menu_name: Optional[str] = None
     menu_category: Optional[str] = None
     menu_price: Optional[int] = Field(default=None, ge=1)
+
+
+
+from pydantic import BaseModel
+
+
+class MostOrderedMenu(BaseModel):
+    menu_name: str
+    orders: int
