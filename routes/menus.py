@@ -364,4 +364,26 @@ def get_most_ordered_items(
 
 
 
-#
+# search menu by name
+@router.get(
+    "/search",
+    response_model=ReadMenuCount,
+    description="Search menu items by name.",
+    response_description="Returns the list of menu items that match the search query.",
+    summary="Search menu items by name",
+    tags=["Frontend: For Users"]
+)
+def search_menu(
+    query: str = Query(..., description="Enter the menu name to search"),
+    session: Session = Depends(get_session)
+):
+    query_stmt = select(MenuTable).where(MenuTable.menu_name.ilike(f"%{query}%"))
+
+    result = session.exec(query_stmt).all()
+
+    return {
+        "status": "success",
+        "count": len(result),
+        "menus": result
+    }   
+

@@ -28,7 +28,7 @@ from src.auth import (
     verify_api_key
 )
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone  
 
 
 ## helper function 
@@ -188,7 +188,8 @@ def get_user_order_summary(
     "/create",
     response_model=ReadOrderWithItems,
     description="Create an order for the currently authenticated user.",
-    response_description="Returns the created order details."
+    response_description="Returns the created order details.",
+    tags=["Frontend: For Users"]
 )
 def create_order(
     order_data: CreateOrder,
@@ -852,13 +853,8 @@ def cancel_order(
 
 
 
-
-from datetime import datetime, timedelta, timezone  
-from sqlmodel import Session, select, func
-
-
 @router.get(
-    "/analytics/revenue",
+    "/admin/analytics/revenue",
     description="Get revenue analytics. Admin access only.",
     response_description="Returns revenue statistics."
 )
@@ -916,7 +912,7 @@ def revenue_analytics(
 
 # order analytics endpoint for admin to see order statistics by status.
 @router.get(
-    "/analytics/orders",
+    "/admin/analytics/orders",
     description="Get order statistics by status. Admin access only.",
     response_description="Returns order statistics."
 )
@@ -970,7 +966,7 @@ def order_analytics(
 
 # top 3 customers based on total spending with customer name and total orders.
 @router.get(
-    "/analytics/top-customers",
+    "/admin/analytics/top-customers",
     description="Get top 3 customers based on total spending. Admin access only.",
     response_description="Returns a list of top 3 customers with their total spending."
 )
@@ -1005,7 +1001,7 @@ def top_customers(
 
 # Top Selling Items
 @router.get(
-    "/analytics/top-items",
+    "/admin/analytics/top-items",
     description="Get top 5 selling menu items. Admin access only.",
     response_description="Returns the top 5 selling menu items."
 )
@@ -1047,3 +1043,5 @@ def top_selling_items(
         }
         for menu_name, quantity_sold, revenue in results
     ]
+
+
